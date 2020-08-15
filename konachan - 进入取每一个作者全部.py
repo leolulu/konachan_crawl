@@ -99,7 +99,6 @@ class KonachanInner:
                 html = self.parse_url(detail_page_url)
                 artist_name = html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/text()")[0]
                 artist_url = self.url_compliet(html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/@href")[0])
-                # orig_img_url = html.xpath("//div[@class='sidebar']//a[contains(@class,'highres-show')]/@href")[0]
                 if deal_func(artist_name) is not None:
                     # 1.点击作者进入作者图像列表
                     next_url = artist_url
@@ -107,6 +106,10 @@ class KonachanInner:
                         html = self.parse_url(next_url)
                         next_url = self.url_compliet(self.extract(html.xpath("//a[text()='Next →']/@href")))
                         img_url_list = html.xpath("//ul[@id='post-list-posts']/li/a/@href")
+                        with self.lock:
+                            if img_url_list[0] in self.history_handler.load() and img_url_list[-1] in self.history_handler.load():
+                                print(artist_name, 'artist没有新作，pass...')
+                                break
                         # 2.获取图像
                         for img_url in img_url_list:
                             executor.submit(self.downloadPic, img_url, artist_name)
@@ -162,5 +165,5 @@ class pickle_handler:
 
 
 if __name__ == "__main__":
-    k1 = KonachanInner(15)
+    k1 = KonachanInner(20)
     k1.run()
