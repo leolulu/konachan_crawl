@@ -71,6 +71,7 @@ class KonachanInner:
         else:
             return parse.urljoin(self.base_url, url)
 
+    @retry(wait_exponential_multiplier=1000, wait_exponential_max=60000)
     def parse_url(self, url):
         '''
         返回可以直接xpath的HTML对象
