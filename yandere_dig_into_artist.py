@@ -8,6 +8,7 @@ from tqdm import trange, tqdm
 import pickle
 from threading import Lock
 import traceback
+import re
 
 
 class KonachanInner:
@@ -135,7 +136,8 @@ class KonachanInner:
                 self.history_urls.add(img_url)
                 self.history_handler.dump(self.history_urls)
             folder_path = self.new_folder(artist_name)
-            pic_path_name = os.path.join(folder_path, artist_name + img_url.split('/')[-1].replace('%20', '_').replace('yande.re', ''))
+            url_file_name = os.path.splitext(img_url.split('/')[-1].replace('%20',''))
+            pic_path_name = os.path.join(folder_path, re.sub(r"\D", "", url_file_name[0]) + url_file_name[-1])
             print('downloading：', img_url)
             if os.path.exists(pic_path_name) == True:
                 # os.remove(pic_path_name)
