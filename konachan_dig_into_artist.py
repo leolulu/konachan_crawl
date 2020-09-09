@@ -15,7 +15,6 @@ class KonachanInner:
     def __init__(self, page_capacity):
         self.page_capacity = page_capacity
         self.except_artist_tag = 'tagme (artist)'
-        self.page_num = 1
         self.base_url = 'http://konachan.net/post'
         self.headers = {
             "Cookie": "vote=1; __utmz=20658210.1460984814.55.2.utmcsr=konachan.com|utmccn=(referral)|utmcmd=referral|utmcct=/post/switch; __cfduid=d18af1d27bb5882a6eff521053cb3cc801525011444; tag-script=; country=US; blacklisted_tags=%5B%22%22%5D; konachan.net=BAh7B0kiD3Nlc3Npb25faWQGOgZFVEkiJTlhYTcwNjk4YzI4NjdjYWU2YjZhYzg2YTZiOWRlZmQ1BjsAVEkiEF9jc3JmX3Rva2VuBjsARkkiMTIxZXdwajVzYVRuR0huSWtWWEUrdlJPOE1EMUdCMHdUdG5yMjFXNmNVNm89BjsARg%3D%3D--8a1e71bdae987934cb60ab31c927084b3c5d85c6; __utmc=20658210; Hm_lvt_ba7c84ce230944c13900faeba642b2b4=1536069861,1536796970,1536939737,1537279770; __utma=20658210.97867196.1446035811.1537370253.1537509624.843; __utmt=1; forum_post_last_read_at=%222018-09-21T08%3A00%3A31%2B02%3A00%22; __utmb=20658210.3.10.1537509624; Hm_lpvt_ba7c84ce230944c13900faeba642b2b4=1537509630",
@@ -71,6 +70,7 @@ class KonachanInner:
         else:
             return parse.urljoin(self.base_url, url)
 
+    @retry(wait_exponential_multiplier=1000, wait_exponential_max=60000)
     def parse_url_get_html(self, url):
         '''
         返回可以直接xpath的HTML对象
@@ -90,13 +90,17 @@ class KonachanInner:
         """
         解析每一个首页
         """
-        detail_page_urls_list = []
-        for _ in trange(page_capacity):
-            html = self.parse_url_get_html('{}?page={}&tags='.format(self.base_url, self.page_num))
+        def parallel_parse_main_page(detail_page_urls_list, page_num):
+            html = self.parse_url_get_html('{}?page={}&tags='.format(self.base_url, page_num+1))
             detail_page_urls = html.xpath("//ul[@id='post-list-posts']/li/div/a/@href")
             detail_page_urls = map(self.url_compliet, detail_page_urls)
             detail_page_urls_list.extend(detail_page_urls)
-            self.page_num += 1
+            print('parse_mainpage', page_num, 'done...')
+
+        detail_page_urls_list = []
+        with ThreadPoolExecutor(8) as executor:
+            for page_num in range(page_capacity):
+                executor.submit(parallel_parse_main_page, detail_page_urls_list, page_num)
         return detail_page_urls_list
 
     def parse_detail_page(self, detail_page_url_list, deal_func):
@@ -106,8 +110,12 @@ class KonachanInner:
         with ThreadPoolExecutor(max_workers=8) as executor:
             for detail_page_url in tqdm(detail_page_url_list):
                 html = self.parse_url_get_html(detail_page_url)
-                artist_name = html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/text()")[0]
-                artist_url = self.url_compliet(html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/@href")[0])
+                try:
+                    artist_name = html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/text()")[0]
+                    artist_url = self.url_compliet(html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/@href")[0])
+                except:
+                    print(detail_page_url, '找不到作者名...')
+                    continue
                 if deal_func(artist_name) is not None:
                     # 1.点击作者进入作者图像列表
                     next_url = artist_url
