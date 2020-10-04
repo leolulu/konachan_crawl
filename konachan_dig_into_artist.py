@@ -183,5 +183,5 @@ class pickle_handler:
 
 
 if __name__ == "__main__":
-    k1 = KonachanInner(100)
+    k1 = KonachanInner(50)
     k1.run()
