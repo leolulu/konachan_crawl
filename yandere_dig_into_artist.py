@@ -9,6 +9,8 @@ import pickle
 from threading import Lock
 import traceback
 import re
+from PIL import Image
+from io import BytesIO
 
 
 class KonachanInner:
@@ -135,15 +137,19 @@ class KonachanInner:
                     return
                 self.history_urls.add(img_url)
                 self.history_handler.dump(self.history_urls)
+            print('下载中', img_url)
+            content = requests.get(img_url, timeout=60, proxies=self.proxies, headers=self.headers).content
+            pic_width, pic_height = Image.open(BytesIO(content)).size
+            if pic_width*1.33 < pic_height:
+                print('宽高比不符，丢弃：', img_url)
+                return
             folder_path = self.new_folder(artist_name)
-            url_file_name = os.path.splitext(img_url.split('/')[-1].replace('%20',''))
+            url_file_name = os.path.splitext(img_url.split('/')[-1].replace('%20', ''))
             pic_path_name = os.path.join(folder_path, re.sub(r"\D", "", url_file_name[0]) + url_file_name[-1])
-            print('downloading：', img_url)
             if os.path.exists(pic_path_name) == True:
                 # os.remove(pic_path_name)
                 pass
             else:
-                content = requests.get(img_url, timeout=60, proxies=self.proxies, headers=self.headers).content
                 with open(pic_path_name, 'wb') as f:
                     f.write(content)
         except:
@@ -178,5 +184,5 @@ class pickle_handler:
 
 
 if __name__ == "__main__":
-    k1 = KonachanInner(5)
+    k1 = KonachanInner(20)
     k1.run()
