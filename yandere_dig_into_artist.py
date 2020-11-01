@@ -137,10 +137,10 @@ class KonachanInner:
                     return
                 self.history_urls.add(img_url)
                 self.history_handler.dump(self.history_urls)
-            print('下载中', img_url)
+            print('下载中：', img_url)
             content = requests.get(img_url, timeout=60, proxies=self.proxies, headers=self.headers).content
             pic_width, pic_height = Image.open(BytesIO(content)).size
-            if pic_width*1.33 < pic_height:
+            if pic_width/1.33 < pic_height:
                 print('宽高比不符，丢弃：', img_url)
                 return
             folder_path = self.new_folder(artist_name)
