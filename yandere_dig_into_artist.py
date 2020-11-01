@@ -29,7 +29,7 @@ class KonachanInner:
         }
         self.session = requests.session()
         self.artist_exsist_set = set()
-        self.history_handler = pickle_handler('yandere.url.history')
+        self.history_handler = pickle_handler('url.history.yandere')
         self.history_urls = self.history_handler.load()
         self.lock = Lock()
         self.executor = ThreadPoolExecutor(max_workers=4)
