@@ -29,6 +29,14 @@ class KonachanInner:
         self.history_handler = pickle_handler('url.history')
         self.history_urls = self.history_handler.load()
         self.lock = Lock()
+        self.download_image_executor = ThreadPoolExecutor(max_workers=16)
+        self.total_detail_page_info = {'total': 0, 'parsed': 0}
+
+    def total_detail_page_info_print(self, if_add):
+        with self.lock:
+            if if_add:
+                self.total_detail_page_info['parsed'] += 1
+            return f"[{self.total_detail_page_info['parsed']}/{self.total_detail_page_info['total']}]"
 
     def extract(self, item):
         if len(item) == 0:
@@ -103,33 +111,35 @@ class KonachanInner:
                 executor.submit(parallel_parse_main_page, detail_page_urls_list, page_num)
         return detail_page_urls_list
 
-    def parse_detail_page(self, detail_page_url_list, deal_func):
+    def parse_detail_page(self, detail_page_url, deal_func):
         """
         解析详情页
         """
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            for detail_page_url in tqdm(detail_page_url_list):
-                html = self.parse_url_get_html(detail_page_url)
-                try:
-                    artist_name = html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/text()")[0]
-                    artist_url = self.url_compliet(html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/@href")[0])
-                except:
-                    print(detail_page_url, '找不到作者名...')
-                    continue
-                if deal_func(artist_name) is not None:
-                    # 1.点击作者进入作者图像列表
-                    next_url = artist_url
-                    while next_url is not None:
-                        html = self.parse_url_get_html(next_url)
-                        next_url = self.url_compliet(self.extract(html.xpath("//a[text()='Next →']/@href")))
-                        img_url_list = html.xpath("//ul[@id='post-list-posts']/li/a/@href")
-                        with self.lock:
-                            if len(img_url_list) > 1 and img_url_list[0] in self.history_handler.load() and img_url_list[-1] in self.history_handler.load():
-                                print(artist_name, 'artist没有新作，pass...')
-                                break
-                        # 2.获取图像
-                        for img_url in img_url_list:
-                            executor.submit(self.downloadPic, img_url, artist_name)
+        try:
+            print(self.total_detail_page_info_print(if_add=True), end='')
+            html = self.parse_url_get_html(detail_page_url)
+            try:
+                artist_name = html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/text()")[0]
+                artist_url = self.url_compliet(html.xpath("//li[contains(@class,'tag-type-artist')]/a[2]/@href")[0])
+            except:
+                print(detail_page_url, '找不到作者名...')
+                return
+            if deal_func(artist_name) is not None:
+                # 1.点击作者进入作者图像列表
+                next_url = artist_url
+                while next_url is not None:
+                    html = self.parse_url_get_html(next_url)
+                    next_url = self.url_compliet(self.extract(html.xpath("//a[text()='Next →']/@href")))
+                    img_url_list = html.xpath("//ul[@id='post-list-posts']/li/a/@href")
+                    with self.lock:
+                        if len(img_url_list) > 1 and img_url_list[0] in self.history_handler.load() and img_url_list[-1] in self.history_handler.load():
+                            print(artist_name, 'artist没有新作，pass...')
+                            break
+                    # 2.获取图像
+                    for img_url in img_url_list:
+                        self.download_image_executor.submit(self.downloadPic, img_url, artist_name)
+        except:
+            print(traceback.format_exc())
 
     @retry(wait_exponential_multiplier=1000, wait_exponential_max=60000)
     def downloadPic(self, img_url, artist_name):
@@ -156,7 +166,10 @@ class KonachanInner:
 
     def run(self):
         detail_page_urls = self.parse_mainpage(self.page_capacity)  # 解析首页，获得每一个详情页的地址
-        self.parse_detail_page(detail_page_urls, self.artist_exsist_func)  # 解析详情页(包括回调函数)
+        self.total_detail_page_info['total'] = len(detail_page_urls)
+        with ThreadPoolExecutor(max_workers=8) as detail_page_parse_executor:
+            for detail_page_url in detail_page_urls:
+                detail_page_parse_executor.submit(self.parse_detail_page, detail_page_url, self.artist_exsist_func)
 
 
 class pickle_handler:
@@ -183,5 +196,5 @@ class pickle_handler:
 
 
 if __name__ == "__main__":
-    k1 = KonachanInner(50)
+    k1 = KonachanInner(999)
     k1.run()
