@@ -9,11 +9,12 @@ import pickle
 from threading import Lock
 import traceback
 import re
+import sys
 
 
 class KonachanInner:
     def __init__(self, page_capacity):
-        self.page_capacity = page_capacity
+        self.page_capacity = int(page_capacity)
         self.except_artist_tag = 'tagme (artist)'
         self.base_url = 'http://konachan.net/post'
         self.headers = {
@@ -196,5 +197,5 @@ class pickle_handler:
 
 
 if __name__ == "__main__":
-    k1 = KonachanInner(999)
+    k1 = KonachanInner(sys.argv[1])
     k1.run()
