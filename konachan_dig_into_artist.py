@@ -197,5 +197,5 @@ class pickle_handler:
 
 
 if __name__ == "__main__":
-    k1 = KonachanInner(sys.argv[1])
+    k1 = KonachanInner(sys.argv[1] if len(sys.argv)==2 else 100)
     k1.run()
